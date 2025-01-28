@@ -10,8 +10,6 @@ const feedbackRoute = require('./routes/feedback');
 
 const app = express();
 
-const port = process.env.PORT || 10000; // Use Render's PORT or default to 10000 if not set
-
 // Middleware setup
 app.use(cors());
 app.use(bodyParser.json());
@@ -26,6 +24,9 @@ app.get('/api/ping', (req, res) => {
   res.status(200).send({ message: 'Server is up and running!' });
 });
 
+const port = process.env.PORT || 5000; // Default to 5000 if no environment variable is set
+
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 });
+
