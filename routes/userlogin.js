@@ -147,16 +147,16 @@ router.post('/logout', async (req, res) => {
     }
 });
 
-// // Add the cron job to update inactive users every minute
-// cron.schedule('* * * * *', async () => {
-//     try {
-//         // Set is_active to 0 for users who haven't logged in for 10 minutes
-//         await db.query(
-//             'UPDATE EremzeActiveUsers SET is_active = 0 WHERE last_login < NOW() - INTERVAL 30 MINUTE'
-//         );
-//     } catch (error) {
-//         console.error('Error updating inactive users:', error);
-//     }
-// });
+// Add the cron job to update inactive users every minute
+cron.schedule('* * * * *', async () => {
+    try {
+        // Set is_active to 0 for users who haven't logged in for 10 minutes
+        await db.query(
+            'UPDATE EremzeActiveUsers SET is_active = 0 WHERE last_login < NOW() - INTERVAL 30 MINUTE'
+        );
+    } catch (error) {
+        console.error('Error updating inactive users:', error);
+    }
+});
 
 module.exports = router;
