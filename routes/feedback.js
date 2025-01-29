@@ -37,7 +37,7 @@ router.post('/userfeedback', async (req, res) => {
     const { user_name, user_surname, user_message, user_email } = req.body;
 
     // Validate input
-    if (!user_name || !user_surname || !user_email) {
+    if (!user_name || !user_surname || !user_message || !user_email) {
         return res.status(400).json({
             info: 'Lütfen tüm alanları doldurduğunuzdan emin olun.',
         });
