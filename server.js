@@ -28,6 +28,9 @@ app.use((req, res, next) => {
         ip = ip.split('::ffff:')[1]; // Extract the IPv4 address from the IPv6 format
     }
 
+    // Clean up spaces in case of multiple IPs coming in
+    ip = ip.split(',').map(ipAddress => ipAddress.trim()).join(',');
+
     // Logging the incoming request's details
     console.log(`Incoming request from IP: ${ip} with origin: ${origin}`);
 
@@ -51,6 +54,7 @@ app.use((req, res, next) => {
     console.log(`Access denied for both origin: ${origin} and IP: ${ip}`);
     return res.status(403).json({ error: 'Access denied' });
 });
+
 
 // Middleware setup
 app.use(cors());
