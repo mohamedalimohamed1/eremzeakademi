@@ -28,18 +28,20 @@ app.use((req, res, next) => {
         ip = ip.split('::ffff:')[1]; // Extract the IPv4 address from the IPv6 format
     }
 
-    // Clean up spaces in case of multiple IPs coming in
-    ip = ip.split(',').map(ipAddress => ipAddress.trim()).join(',');
+    // Clean up spaces and split the incoming IPs if they are comma-separated
+    const ipList = ip.split(',').map(ipAddress => ipAddress.trim());
 
     // Logging the incoming request's details
-    console.log(`Incoming request from IP: ${ip} with origin: ${origin}`);
+    console.log(`Incoming request from IPs: ${ipList} with origin: ${origin}`);
 
-    // Check if the request is from an allowed IP
-    if (ALLOWED_IPS.includes(ip)) {
-        console.log(`Access granted for IP: ${ip}`);
-        return next(); // IP matches, grant access
+    // Check if the request is from any of the allowed IPs
+    const isAllowedIP = ipList.some(ipAddress => ALLOWED_IPS.includes(ipAddress));
+
+    if (isAllowedIP) {
+        console.log(`Access granted for IP: ${ipList}`);
+        return next(); // At least one IP matches, grant access
     } else {
-        console.log(`Access denied for IP: ${ip}`);
+        console.log(`Access denied for IPs: ${ipList}`);
     }
 
     // Check if the request's origin matches the allowed domain
@@ -51,9 +53,10 @@ app.use((req, res, next) => {
     }
 
     // If neither IP nor domain match, deny access
-    console.log(`Access denied for both origin: ${origin} and IP: ${ip}`);
+    console.log(`Access denied for both origin: ${origin} and IPs: ${ipList}`);
     return res.status(403).json({ error: 'Access denied' });
 });
+
 
 
 // Middleware setup
