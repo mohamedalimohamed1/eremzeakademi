@@ -24,6 +24,11 @@ app.use((req, res, next) => {
         ip = ip.split('::ffff:')[1]; // Extract the IPv4 address from the IPv6 format
     }
 
+    // If the 'x-forwarded-for' contains multiple IPs, pick the first one that isn't local
+    if (ip.includes(',')) {
+        ip = ip.split(',')[0]; // Get the first IP in the list
+    }
+
     // Logging the incoming request's details
     console.log(`Incoming request from IP: ${ip} with origin: ${origin}`);
 
