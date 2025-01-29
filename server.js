@@ -12,7 +12,7 @@ const app = express();
 
 // Load allowed domain and IP from .env
 const ALLOWED_DOMAIN = process.env.DMN_NME;
-const ALLOWED_IP = process.env.PC_IP;
+const ALLOWED_IPS = process.env.PC_IP.split(','); // Split the comma-separated list of IPs
 
 // Middleware to restrict access with logs
 app.use((req, res, next) => {
@@ -28,7 +28,7 @@ app.use((req, res, next) => {
     console.log(`Incoming request from IP: ${ip} with origin: ${origin}`);
 
     // Check if the request is from a valid IP
-    if (ip === ALLOWED_IP) {
+    if (ALLOWED_IPS.includes(ip)) {
         console.log(`Access granted for IP: ${ip}`);
         return next(); // IP matches, grant access
     } else {
