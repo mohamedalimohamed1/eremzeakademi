@@ -10,9 +10,13 @@ const feedbackRoute = require('./routes/feedback');
 
 const app = express();
 
-// Load allowed domain and IP from .env
+// Load allowed domain and IPs from .env
 const ALLOWED_DOMAIN = process.env.DMN_NME;
-const ALLOWED_IPS = process.env.PC_IP.split(','); // Split the comma-separated list of IPs
+const ALLOWED_IPS = (process.env.PC_IP || "").split(','); // Split comma-separated IPs
+
+// Log the values of ALLOWED_DOMAIN and ALLOWED_IPS to verify they are read correctly
+console.log('ALLOWED_DOMAIN:', ALLOWED_DOMAIN);
+console.log('ALLOWED_IPS:', ALLOWED_IPS);
 
 // Middleware to restrict access with logs
 app.use((req, res, next) => {
@@ -24,15 +28,10 @@ app.use((req, res, next) => {
         ip = ip.split('::ffff:')[1]; // Extract the IPv4 address from the IPv6 format
     }
 
-    // If the 'x-forwarded-for' contains multiple IPs, pick the first one that isn't local
-    if (ip.includes(',')) {
-        ip = ip.split(',')[0]; // Get the first IP in the list
-    }
-
     // Logging the incoming request's details
     console.log(`Incoming request from IP: ${ip} with origin: ${origin}`);
 
-    // Check if the request is from a valid IP
+    // Check if the request is from an allowed IP
     if (ALLOWED_IPS.includes(ip)) {
         console.log(`Access granted for IP: ${ip}`);
         return next(); // IP matches, grant access
