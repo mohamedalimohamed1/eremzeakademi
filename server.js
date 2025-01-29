@@ -10,13 +10,13 @@ const feedbackRoute = require('./routes/feedback');
 
 const app = express();
 
-// Load allowed domain and IPs from .env
 const ALLOWED_DOMAIN = process.env.DMN_NME;
-const ALLOWED_IPS = (process.env.PC_IP || "").split(','); // Split comma-separated IPs
+const ALLOWED_IPS = (process.env.PC_IP || "").split(',');
 
-// Log the values of ALLOWED_DOMAIN and ALLOWED_IPS to verify they are read correctly
+// Log values for debugging
 console.log('ALLOWED_DOMAIN:', ALLOWED_DOMAIN);
 console.log('ALLOWED_IPS:', ALLOWED_IPS);
+
 
 // Middleware to restrict access with logs
 app.use((req, res, next) => {

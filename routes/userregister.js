@@ -50,7 +50,7 @@ router.post('/userregister', async (req, res) => {
     const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // Send a verification email
-    const verificationLink = `http://localhost:5000/api/verify-email?token=${token}`;
+    const verificationLink = `https://eremzeakademi.onrender.com/api/verify-email?token=${token}`;
 
     const mailOptions = {
       from: 'eremze@eremzeakademi.com',
