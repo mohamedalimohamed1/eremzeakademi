@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../config/db');
 const transporter = require('../config/transporter');
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // Use crypto for generating random numbers
 require('dotenv').config();
 
 const router = express.Router();
@@ -12,6 +12,7 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$
 router.post('/userregister', async (req, res) => {
   const { firstName, lastName, email, password, confirmPassword } = req.body;
 
+  // Validate input
   if (!nameRegex.test(firstName)) {
     return res.status(400).json({ message: 'Ad yalnızca harflerden oluşmalıdır ve 2-15 karakter arasında olmalıdır.' });
   }
@@ -29,37 +30,37 @@ router.post('/userregister', async (req, res) => {
   }
 
   try {
-    // Checks if the email already exists in the permanent table
+    // Check if the email already exists in the permanent table
     const [rows] = await db.query('SELECT user_email FROM EremzeUsers WHERE user_email = ?', [email]);
     if (rows.length > 0) {
       return res.status(400).json({ message: 'Bu e-mail adresi zaten kayıtlı.' });
     }
 
-    // Checks if the email already exists in the temporary table
+    // Check if the email already exists in the temporary table
     const [tempRows] = await db.query('SELECT user_email FROM TempEremzeUsers WHERE user_email = ?', [email]);
     if (tempRows.length > 0) {
-      return res.status(400).json({ message: 'Doğrulama linki e-posta adresinize gönderildi. Lütfen doğrulama için e-postayı kontrol edin, görmüyorsanız spam/junk klasörüne bakın.' });
+      return res.status(400).json({ message: 'Doğrulama kodu e-posta adresinize gönderildi. Lütfen doğrulama için e-postayı kontrol edin.' });
     }
 
-    // Save the plain password directly (no hashing)
+    // Generate 4-digit verification code and expiration time
+    const verificationCode = crypto.randomInt(1000, 9999).toString();
+    const codeExpiration = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Save the user in the temporary table
     await db.query(
-      'INSERT INTO TempEremzeUsers (user_name, user_surname, user_email, user_password) VALUES (?, ?, ?, ?)',
-      [firstName, lastName, email, password]
+      'INSERT INTO TempEremzeUsers (user_name, user_surname, user_email, user_password, user_verification_code, code_expiration) VALUES (?, ?, ?, ?, ?, ?)',
+      [firstName, lastName, email, password, verificationCode, codeExpiration]
     );
 
-    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // Send a verification email
-    const verificationLink = `http://localhost:5000/api/verify-email?token=${token}`;
-
+    // Send verification email with the code
     const mailOptions = {
       from: 'eremze@eremzeakademi.com',
       to: email,
-      subject: 'E Posta Doğrulama',
+      subject: 'E-posta Doğrulama Kodu',
       html: `
         <p>Merhaba ${firstName},</p>
-        <p>Lütfen aşağıdaki bağlantıya tıklayarak e-posta adresinizi doğrulayın:</p>
-        <p><a href="${verificationLink}">E-posta adresinizi doğrulamak için buraya tıklayın</a></p>
+        <p>Doğrulama kodunuz: <strong>${verificationCode}</strong></p>
+        <p>Bu kod 15 dakika geçerlidir.</p>
       `,
     };
 
@@ -78,30 +79,26 @@ router.post('/userregister', async (req, res) => {
   }
 });
 
-module.exports = router;
-
-module.exports = router;
-
-
-// After user clicks the verification link and email is verified
-router.get('/verify-email', async (req, res) => {
-  const { token } = req.query;
-  console.log("Token received for verification:", token); // Log token
+// New endpoint for code verification
+router.post('/verify-email-code', async (req, res) => {
+  const { email, verificationCode } = req.body;
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Use the secret key from .env
-    const email = decoded.email;
+    // Check if the email and code exist in the temporary table
+    const [tempUser ] = await db.query(
+      `SELECT * FROM TempEremzeUsers 
+       WHERE user_email = ? 
+       AND user_verification_code = ? 
+       AND code_expiration > NOW()`,
+      [email, verificationCode]
+    );
 
-    console.log("Decoded token:", decoded); // Log the decoded token
-
-    // Check if the email exists in the temporary table
-    const [tempUser] = await db.query('SELECT * FROM TempEremzeUsers WHERE user_email = ?', [email]);
-    if (tempUser.length === 0) {
-      return res.status(400).json({ message: 'Kullanıcı bulunamadı.' });
+    if (tempUser .length === 0) {
+      return res.status(400).json({ message: 'Geçersiz kod veya süresi dolmuş' });
     }
 
     // Move the user from the temporary table to the permanent table
-    const user = tempUser[0];
+    const user = tempUser [0];
     await db.query(
       'INSERT INTO EremzeUsers (user_name, user_surname, user_email, user_password) VALUES (?, ?, ?, ?)',
       [user.user_name, user.user_surname, user.user_email, user.user_password]
@@ -120,7 +117,7 @@ router.get('/verify-email', async (req, res) => {
       subject: 'E-posta Doğrulama Başarılı!',
       html: `
         <p>Merhaba ${user.user_name},</p>
-        <p>E-postaınız başarıyla doğrulandı!</p>
+        <p>E-posta adresiniz başarıyla doğrulandı!</p>
       `,
     };
 
@@ -132,13 +129,12 @@ router.get('/verify-email', async (req, res) => {
       console.log('Confirmation email sent:', info.response);
     });
 
-    res.status(200).json({ message: 'Email başarıyla doğrulandı!.' });
+    res.status(200).json({ message: 'E-posta başarıyla doğrulandı!' });
 
   } catch (error) {
-    console.error("Token verification failed:", error); 
-    res.status(400).json({ message: 'Geçersiz veya süresi dolmuş doğrulama bağlantısı.' });
+    console.error("Verification error:", error);
+    res.status(500).json({ message: 'Doğrulama işlemi başarısız oldu' });
   }
 });
-
 
 module.exports = router;

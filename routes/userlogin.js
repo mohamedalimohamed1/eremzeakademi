@@ -44,23 +44,17 @@ router.post('/userlogin', async (req, res) => {
             });
         }
 
-        // Insert or update user in EremzeActiveUsers table
+        // update user in EremzeUsers table
         const [activeUserRows] = await db.query(
-            'SELECT * FROM EremzeActiveUsers WHERE user_email = ?',
+            'SELECT * FROM EremzeUsers WHERE user_email = ?',
             [email]
         );
 
         if (activeUserRows.length > 0) {
-            // If the user is already in the active users table, update the info
+            // If the user is already is active, update the info
             await db.query(
-                'UPDATE EremzeActiveUsers SET is_active = 1, last_login = CURRENT_TIMESTAMP WHERE user_email = ?',
+                'UPDATE EremzeUsers SET is_active = 1, last_login = CURRENT_TIMESTAMP WHERE user_email = ?',
                 [email]
-            );
-        } else {
-            // Otherwise, insert the new user into the active users table
-            await db.query(
-                'INSERT INTO EremzeActiveUsers (user_name, user_surname, user_email, last_login, is_active) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)',
-                [user.user_name, user.user_surname, email]
             );
         }
 
@@ -97,7 +91,7 @@ router.post('/activeuser', async (req, res) => {
 
     try {
         const [rows] = await db.query(
-            'SELECT * FROM EremzeActiveUsers WHERE user_email = ? AND is_active = 1',
+            'SELECT * FROM EremzeUsers WHERE user_email = ? AND is_active = 1',
             [email]
         );
 
@@ -127,7 +121,7 @@ router.post('/logout', async (req, res) => {
     try {
         // Update the is_active field to 0 for the user
         const [result] = await db.query(
-            'UPDATE EremzeActiveUsers SET is_active = 0 WHERE user_email = ?',
+            'UPDATE EremzeUsers SET is_active = 0 WHERE user_email = ?',
             [email]
         );
 
@@ -152,7 +146,7 @@ cron.schedule('* * * * *', async () => {
     try {
         // Set is_active to 0 for users who haven't logged in for 10 minutes
         await db.query(
-            'UPDATE EremzeActiveUsers SET is_active = 0 WHERE last_login < NOW() - INTERVAL 30 MINUTE'
+            'UPDATE EremzeUsers SET is_active = 0 WHERE last_login < NOW() - INTERVAL 30 MINUTE'
         );
     } catch (error) {
         console.error('Error updating inactive users:', error);

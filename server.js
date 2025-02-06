@@ -1,81 +1,86 @@
 require('dotenv').config({ path: '../.env' });
-
 const express = require('express');
+const session = require('express-session');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const morgan = require('morgan');
 
 const userRegisterRoute = require('./routes/userregister');
 const userLoginRoute = require('./routes/userlogin');
 const feedbackRoute = require('./routes/feedback');
+const adminregister = require('./routes/adminregister');
+const emailVerification = require('./routes/emailverification');
+const adminfdback = require('./routes/adminfedback');
+const adminRoutes = require('./routes/adminRoutes');
+const AdminProfile = require('./routes/adminprofile');
+
+const jwtScrt = process.env.JWT_SECRET;
+const ALLOWED_DOMAIN = process.env.DMN_NME;
+const ALLOWED_IPS = (process.env.PC_IP || "").split(',');
 
 const app = express();
 
-// Load allowed domain and IPs from .env
-const ALLOWED_DOMAIN = process.env.DMN_NME;
-const ALLOWED_IPS = (process.env.PC_IP || "").split(','); // Split comma-separated IPs
+// 1. Configure Middleware
+app.use(cors({
+  origin: ALLOWED_DOMAIN,
+  methods: 'GET,POST,PUT,DELETE',
+  credentials: true
+}));
 
-// Log the values of ALLOWED_DOMAIN and ALLOWED_IPS to verify they are read correctly
-console.log('ALLOWED_DOMAIN:', ALLOWED_DOMAIN);
-console.log('ALLOWED_IPS:', ALLOWED_IPS);
+app.use(morgan('dev')); // Log HTTP requests
+app.use(express.json());
+app.use(bodyParser.json());
 
-// Middleware to restrict access with logs
+// 2. Configure Sessions
+app.use(session({
+  secret: jwtScrt,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' } // Secure in production
+}));
+
+// 3. IP & Domain Access Control Middleware
 app.use((req, res, next) => {
-    const origin = req.get('origin'); // For browser-based requests
-    let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; // Client IP
+    const origin = req.get('origin');
+    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     
-    // Handle both IPv4 and IPv6 formats
-    if (ip.includes('::ffff:')) {
-        ip = ip.split('::ffff:')[1]; // Extract the IPv4 address from the IPv6 format
+    if (ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
+
+    const ipList = ip.split(',').map(ip => ip.trim());
+    const isAllowedIP = ipList.some(ip => ALLOWED_IPS.includes(ip));
+
+    if (isAllowedIP || (origin && origin.includes(ALLOWED_DOMAIN))) {
+        console.log(`Access granted. IP: ${ip}, Origin: ${origin}`);
+        return next();
     }
 
-    // Clean up spaces and split the incoming IPs if they are comma-separated
-    const ipList = ip.split(',').map(ipAddress => ipAddress.trim());
-
-    // Logging the incoming request's details
-    console.log(`Incoming request from IPs: ${ipList} with origin: ${origin}`);
-
-    // Check if the request is from any of the allowed IPs
-    const isAllowedIP = ipList.some(ipAddress => ALLOWED_IPS.includes(ipAddress));
-
-    if (isAllowedIP) {
-        console.log(`Access granted for IP: ${ipList}`);
-        return next(); // At least one IP matches, grant access
-    } else {
-        console.log(`Access denied for IPs: ${ipList}`);
-    }
-
-    // Check if the request's origin matches the allowed domain
-    if (origin && origin.includes(ALLOWED_DOMAIN)) {
-        console.log(`Access granted for origin: ${origin}`);
-        return next(); // Domain matches, grant access
-    } else {
-        console.log(`Access denied for origin: ${origin}`);
-    }
-
-    // If neither IP nor domain match, deny access
-    console.log(`Access denied for both origin: ${origin} and IPs: ${ipList}`);
+    console.log(`Access denied. Origin: ${origin}, IPs: ${ipList}`);
     return res.status(403).json({ error: 'Access denied' });
 });
 
-
-
-// Middleware setup
-app.use(cors());
-app.use(bodyParser.json());
-
-// Routes
+// 4. Register API Routes
 app.use('/api', userRegisterRoute);
 app.use('/api', userLoginRoute);
 app.use('/api', feedbackRoute);
+app.use('/api', adminregister);
+app.use('/api', emailVerification);
+app.use('/api', adminfdback);
+app.use('/api', adminRoutes);
+app.use('/api', AdminProfile);
 
-// Health check route
+// 5. Health Check Route
 app.get('/api/ping', (req, res) => {
     res.status(200).send({ message: 'Server is up and running!' });
-    console.log('Health check successful');
 });
 
-const port = process.env.PORT || 5000; // Default to 5000 if no environment variable is set
+// 6. Global Error Handling Middleware
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+});
 
+// 7. Start the Server
+const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });

@@ -46,7 +46,7 @@ router.post('/userfeedback', async (req, res) => {
     try {
         // Save feedback to the database
         await db.query(
-            'INSERT INTO TempEremzeUserFeedback (user_name, user_surname, user_message) VALUES (?, ?, ?)',
+            'INSERT INTO EremzeUserFeedback (user_name, user_surname, user_message) VALUES (?, ?, ?)',
             [user_name, user_surname, user_message]
         );
 
