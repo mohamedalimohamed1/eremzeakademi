@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -13,6 +13,10 @@ const emailVerification = require('./routes/emailverification');
 const adminfdback = require('./routes/adminfedback');
 const adminRoutes = require('./routes/adminRoutes');
 const AdminProfile = require('./routes/adminprofile');
+
+// Add this right after dotenv config
+const environment = process.env.NODE_ENV || 'development';
+console.log(`Running in ${environment} mode`);
 
 const jwtScrt = process.env.JWT_SECRET;
 const ALLOWED_DOMAIN = process.env.DMN_NME;
@@ -36,26 +40,48 @@ app.use(session({
   secret: jwtScrt,
   resave: false,
   saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production' } // Secure in production
+  cookie: { secure: process.env.NODE_ENV === 'production' }
 }));
 
-// 3. IP & Domain Access Control Middleware
+// 3. Enhanced IP & Domain Access Control Middleware
 app.use((req, res, next) => {
     const origin = req.get('origin');
-    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    let clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     
-    if (ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
+    // Clean IP address formatting
+    clientIP = clientIP.replace('::ffff:', '').split(',')[0].trim();
+    const cleanOrigin = origin ? new URL(origin).hostname : 'no-origin';
 
-    const ipList = ip.split(',').map(ip => ip.trim());
-    const isAllowedIP = ipList.some(ip => ALLOWED_IPS.includes(ip));
+    // IP-based access check
+    const isAllowedIP = ALLOWED_IPS.some(ip => {
+        return clientIP === ip || ip.includes(clientIP);
+    });
 
-    if (isAllowedIP || (origin && origin.includes(ALLOWED_DOMAIN))) {
-        console.log(`Access granted. IP: ${ip}, Origin: ${origin}`);
+    // Origin-based access check
+    const isAllowedOrigin = origin ? 
+        new URL(origin).hostname.includes(ALLOWED_DOMAIN) : 
+        false;
+
+    // Grant access if either condition is met
+    if (isAllowedIP || isAllowedOrigin) {
+        console.log(`Access granted - IP: ${clientIP}, Origin: ${cleanOrigin}`);
         return next();
     }
 
-    console.log(`Access denied. Origin: ${origin}, IPs: ${ipList}`);
-    return res.status(403).json({ error: 'Access denied' });
+    // Detailed rejection logging
+    console.warn(`Access denied - IP: ${clientIP}, Origin: ${cleanOrigin}`);
+    console.log(`Allowed IPs: ${ALLOWED_IPS.join(', ')}`);
+    console.log(`Allowed Domain: ${ALLOWED_DOMAIN}`);
+    
+    return res.status(403).json({ 
+        error: 'Access denied',
+        details: {
+            yourIp: clientIP,
+            allowedIps: ALLOWED_IPS,
+            yourOrigin: cleanOrigin,
+            allowedDomain: ALLOWED_DOMAIN
+        }
+    });
 });
 
 // 4. Register API Routes
